@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  jobmanager:
+    image: apache/flink:1.14.0-scala_2.12-java11
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"       # Exposes the Flink Dashboard UI
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      # Increase the JobManager’s process memory
+      - jobmanager.memory.process.size=2048m
+    networks:
+      - flink-network
+    volumes:
+      - ./job/target:/opt/flink/usrlib
+
+  taskmanager:
+    image: apache/flink:1.14.0-scala_2.12-java11
+    container_name: flink-taskmanager
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      # Increase TaskManager memory and number of slots
+      - taskmanager.numberOfTaskSlots=2
+      - taskmanager.memory.process.size=3072m
+      - taskmanager.memory.task.heap.size=1024m
+      - taskmanager.memory.managed.size=1024m
+    networks:
+      - flink-network
+    # (Optional) Set Docker resource limits for this container
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 3g
+
+  generator:
+    build: ./generator
+    container_name: sensor-generator
+    hostname: generator
+    ports:
+      - "9999:9999"       # Exposes the TCP port for sensor data
+    networks:
+      - flink-network
+
+networks:
+  flink-network:
+    driver: bridge
